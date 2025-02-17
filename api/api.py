@@ -21,7 +21,12 @@ model = joblib.load(model_path)
 scaler = joblib.load(scaler_path)
 
 # Chargement des données avec SK_ID_CURR comme index
-df = pd.read_csv(data_path, index_col="SK_ID_CURR")
+# df = pd.read_csv(data_path, index_col="SK_ID_CURR")
+url = (
+    "https://drive.google.com/file/d/1ZUh45n-3RL-WlUehkZpEDYFugTBJuCAR/view?usp=sharing"
+)
+url = url.replace("/file/d/", "/uc?id=").replace("/view?usp=sharing", "")
+df = pd.read_csv(url, index_col="SK_ID_CURR")
 MIN_ID = df.index.min()
 MAX_ID = df.index.max()
 
