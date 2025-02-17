@@ -60,3 +60,11 @@ async def predict(client_id: int):
 @app.get("/")
 async def root():
     return {"message": "API de prédiction de crédit opérationnelle"}
+
+
+# Modifiez la fin du fichier api.py
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=port)
