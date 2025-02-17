@@ -2,11 +2,20 @@ from fastapi import FastAPI, HTTPException
 import joblib
 import numpy as np
 import pandas as pd
+from pathlib import Path
+import os
+
+port = int(os.getenv("PORT", 8000))
 
 path = r"C:\Users\lenovo\Desktop\OpenClassrooms\PROJET_OC\PROJET_7\PROJET_7"
 
 # Initialisation de l'API
 app = FastAPI(title="API Prédiction Crédit")
+
+# Utilisation de chemins relatifs
+base_dir = Path(__file__).parent.parent  # Remonte d'un niveau depuis le dossier api
+model_path = base_dir / "models" / "credit_model.joblib"
+scaler_path = base_dir / "models" / "scaler.joblib"
 
 # Chargement du modèle et du scaler
 model = joblib.load(path + r"\models\credit_model.joblib")
