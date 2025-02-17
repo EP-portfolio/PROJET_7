@@ -26,7 +26,7 @@ url = (
     "https://drive.google.com/file/d/1ZUh45n-3RL-WlUehkZpEDYFugTBJuCAR/view?usp=sharing"
 )
 url = url.replace("/file/d/", "/uc?id=").replace("/view?usp=sharing", "")
-df = pd.read_csv(url, index_col="SK_ID_CURR")
+df = pd.read_csv(url)
 MIN_ID = df.index.min()
 MAX_ID = df.index.max()
 
