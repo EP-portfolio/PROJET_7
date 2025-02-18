@@ -59,77 +59,58 @@ def get_client_row(client_id: int):
     with open(CSV_PATH, "r") as f:
         f.seek(index[client_id])
         row = next(csv.reader(f))
-        # Ajout de logs
-        print(f"Headers originaux: {app.state.headers}")
-        print(f"Données brutes: {row[:5]}...")  # Affiche les 5 premières colonnes
+        df = pd.DataFrame([row], columns=app.state.headers)
 
-        # Vérification de l'alignement
-        if len(row) != len(app.state.headers):
-            print(f"Désalignement détecté:")
-            print(f"Nombre de colonnes dans row: {len(row)}")
-            print(f"Nombre de headers: {len(app.state.headers)}")
+        # Debug: afficher l'état avant la transformation
+        initial_state = {
+            "initial_columns": list(df.columns)[:10],
+            "initial_length": len(df.columns),
+        }
 
-        return row
+        # Définir SK_ID_CURR comme index
+        if "SK_ID_CURR" in df.columns:
+            df.set_index("SK_ID_CURR", inplace=True)
+
+        # Assurer l'alignement avec les colonnes du modèle
+        model_columns = app.state.model.feature_names_in_
+        df = df.reindex(columns=model_columns, fill_value=0)
+
+        # Debug: afficher l'état après la transformation
+        final_state = {
+            "final_columns": list(df.columns)[:10],
+            "final_length": len(df.columns),
+        }
+
+        return row, initial_state, final_state
 
 
-# Endpoints
 @app.get("/predict/{client_id}")
 async def predict(client_id: int):
     try:
         # Récupération des données
-        row = await asyncio.to_thread(get_client_row, client_id)
-        if not row:
+        result = await asyncio.to_thread(get_client_row, client_id)
+        if not result:
             raise HTTPException(status_code=404, detail="Client introuvable")
 
-        # Ajout de logs pour debug
-        print(f"Nombre de colonnes dans row: {len(row)}")
-        print(f"Headers attendus: {len(app.state.headers)}")
+        row, initial_state, final_state = result
 
-        # Conversion en DataFrame avec vérification explicite
-        df = pd.DataFrame([row], columns=app.state.headers)
-        print(f"Colonnes dans DataFrame: {df.shape[1]}")
-        print(
-            f"Colonnes manquantes: {set(app.state.model.feature_names_in_) - set(df.columns)}"
-        )
-        print(
-            f"Colonnes en trop: {set(df.columns) - set(app.state.model.feature_names_in_)}"
-        )
-
-        if "TARGET" in df.columns:
-            df = df.drop(columns=["TARGET", "SK_ID_CURR"])
-
-        # Plus de logs
-        print(f"Colonnes après drop: {df.shape[1]}")
-        print(f"Colonnes attendues par le modèle: {app.state.model.n_features_in_}")
-
-        # Vérification et alignement des colonnes
-        expected_columns = app.state.model.feature_names_in_
-        df = df.reindex(columns=expected_columns, fill_value=0)
-
-        scaled_data = app.state.scaler.transform(df)
-        proba = app.state.model.predict_proba(scaled_data)[0][1]
-
-        return {
-            "client_id": client_id,
-            "probability": round(proba, 4),
-            "decision": "Refusé" if proba >= 0.36 else "Accepté",
+        debug_info = {
+            "original_data": {
+                "headers_sample": list(app.state.headers)[:10],
+                "row_sample": row[:10],
+                "headers_length": len(app.state.headers),
+                "row_length": len(row),
+                "model_features": app.state.model.n_features_in_,
+            },
+            "dataframe_states": {"initial": initial_state, "final": final_state},
         }
+
+        return debug_info
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail={
-                "error": str(e),
-                "row_length": len(row) if "row" in locals() else None,
-                "headers_length": (
-                    len(app.state.headers) if hasattr(app.state, "headers") else None
-                ),
-                "model_features": (
-                    app.state.model.n_features_in_
-                    if hasattr(app.state, "model")
-                    else None
-                ),
-            },
+            detail=str(e) if "debug_info" not in locals() else debug_info,
         )
 
 
