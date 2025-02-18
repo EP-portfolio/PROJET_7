@@ -33,10 +33,6 @@ async def lifespan(app: FastAPI):
 
     yield  # L'application est prête
 
-    # Nettoyage (optionnel)
-    if CSV_PATH.exists():
-        CSV_PATH.unlink()
-
 
 def download_files():
     """Télécharge les fichiers de données de manière synchrone"""
@@ -64,33 +60,46 @@ def get_client_row(client_id: int):
         return None, debug_info
 
     with open(CSV_PATH, "r") as f:
-        pos = index[client_id]
-        # Reculer jusqu'au début de la ligne
-        f.seek(max(0, pos - 100))  # Reculer de 100 caractères pour être sûr
-        buffer = f.read(200)  # Lire un buffer suffisant
+        # Lire les 5 premières lignes pour debug
+        first_lines = []
+        for _ in range(5):
+            line = f.readline().strip()
+            if line:
+                first_lines.append(line)
 
-        # Trouver le début de la ligne
-        newline_pos = buffer.find("\n")
-        if newline_pos != -1:
-            # Repositionner au début de la ligne
-            f.seek(max(0, pos - 100) + newline_pos + 1)
-            row = next(csv.reader(f))
+        debug_info["first_lines"] = first_lines
 
-            debug_info.update(
-                {
-                    "buffer_sample": buffer[:50],
-                    "row_length": len(row) if row else 0,
-                    "row_content": row[:10] if row else None,
-                }
-            )
+        # Retourner au début du fichier
+        f.seek(0)
 
-            if not row or len(row) == 0:
-                return None, debug_info
+        # Chercher la ligne avec l'ID du client
+        for line in f:
+            if line.startswith(str(client_id)):
+                row = next(csv.reader([line]))
+                debug_info.update(
+                    {
+                        "found_line": line[:100],
+                        "row_length": len(row),
+                        "row_content": row[:10] if row else None,
+                    }
+                )
 
-            return row, debug_info
-        else:
-            debug_info["error"] = "Pas de nouvelle ligne trouvée dans le buffer"
-            return None, debug_info
+                # Traitement des valeurs
+                if row and len(row) > 1:  # Ignorer la première colonne (index)
+                    processed_data = {}
+                    for i, value in enumerate(
+                        row[1:], 1
+                    ):  # Commencer à 1 pour ignorer l'index
+                        if i < len(app.state.headers):
+                            header = app.state.headers[i]
+                            try:
+                                processed_data[header] = float(value)
+                            except ValueError:
+                                processed_data[header] = 0
+                    return processed_data, debug_info
+
+        debug_info["error"] = "Client non trouvé dans le fichier"
+        return None, debug_info
 
 
 @app.get("/predict/{client_id}")
@@ -111,12 +120,9 @@ async def predict(client_id: int):
 
         client_data, debug_info = result
 
-        # Créer le DataFrame avec les données traitées
-        df = pd.DataFrame([client_data])
-
-        # Alignement avec le modèle
-        if hasattr(app.state.model, "feature_names_in_"):
-            df = df.reindex(columns=app.state.model.feature_names_in_, fill_value=0)
+        # Créer le DataFrame avec les noms de colonnes explicites
+        expected_features = app.state.model.feature_names_in_
+        df = pd.DataFrame([client_data], columns=expected_features)
 
         # Prédiction
         scaled_data = app.state.scaler.transform(df)
