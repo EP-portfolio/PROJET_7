@@ -107,14 +107,17 @@ async def predict(client_id: int):
     try:
         # Récupération des données avec debug
         result = await asyncio.to_thread(get_client_row, client_id)
-        if result is None:
+
+        # Vérifier si le client existe
+        if not result or result[0] is None:
             min_id = min(app.state.client_index.keys())
             max_id = max(app.state.client_index.keys())
             raise HTTPException(
                 status_code=404,
                 detail={
-                    "message": "Client introuvable ou données invalides",
+                    "message": "Client introuvable",
                     "plage_valide": f"Les IDs clients valides sont compris entre {min_id} et {max_id}",
+                    "exemple_ids": list(sorted(app.state.client_index.keys()))[:5],
                 },
             )
 
@@ -136,6 +139,8 @@ async def predict(client_id: int):
             },
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
