@@ -60,92 +60,45 @@ def get_client_row(client_id: int):
     with open(CSV_PATH, "r") as f:
         f.seek(index[client_id])
         row = next(csv.reader(f))
-        df = pd.DataFrame([row], columns=app.state.headers)
 
-        # Debug: afficher l'état avant la transformation
-        initial_state = {
-            "initial_columns": list(df.columns)[:10],
-            "initial_length": len(df.columns),
+        # Debug info avant création du DataFrame
+        debug_data = {
+            "headers_info": {
+                "length": len(app.state.headers),
+                "first_10": list(app.state.headers)[:10],
+                "last_10": list(app.state.headers)[-10:],
+            },
+            "row_info": {
+                "length": len(row),
+                "first_10": row[:10],
+                "last_10": row[-10:],
+            },
         }
 
-        # Définir SK_ID_CURR comme index
-        if "SK_ID_CURR" in df.columns:
-            df.set_index("SK_ID_CURR", inplace=True)
-
-        # Assurer l'alignement avec les colonnes du modèle
-        model_columns = app.state.model.feature_names_in_
-        df = df.reindex(columns=model_columns, fill_value=0)
-
-        # Debug: afficher l'état après la transformation
-        final_state = {
-            "final_columns": list(df.columns)[:10],
-            "final_length": len(df.columns),
-        }
-
-        return row, initial_state, final_state
+        return debug_data
 
 
 @app.get("/predict/{client_id}")
 async def predict(client_id: int):
     try:
-        # Initialisation des variables de debug
-        debug_info = {}
-
-        # Récupération des données
-        row = await asyncio.to_thread(get_client_row, client_id)
-        if not row:
+        # Récupération des données avec debug
+        debug_data = await asyncio.to_thread(get_client_row, client_id)
+        if not debug_data:
             raise HTTPException(status_code=404, detail="Client introuvable")
 
-        # Ajout des informations initiales
-        debug_info["initial_state"] = {
-            "headers_sample": list(app.state.headers)[:10],
-            "row_sample": row[:10],
-            "headers_length": len(app.state.headers),
-            "row_length": len(row),
-            "model_features": app.state.model.n_features_in_,
+        return {
+            "debug_data": debug_data,
+            "message": "Données brutes avant création du DataFrame",
         }
-
-        # Conversion en DataFrame
-        df = pd.DataFrame([row], columns=app.state.headers)
-        debug_info["after_df_creation"] = {
-            "df_columns": list(df.columns)[:10],
-            "df_shape": df.shape,
-        }
-
-        # Gestion de l'index
-        if "SK_ID_CURR" in df.columns:
-            df.set_index("SK_ID_CURR", inplace=True)
-            debug_info["after_index_set"] = {
-                "df_columns": list(df.columns)[:10],
-                "df_shape": df.shape,
-            }
-
-        # Alignement avec le modèle
-        expected_columns = app.state.model.feature_names_in_
-        df = df.reindex(columns=expected_columns, fill_value=0)
-        debug_info["final_state"] = {
-            "df_columns": list(df.columns)[:10],
-            "df_shape": df.shape,
-        }
-
-        # Prédiction
-        scaled_data = app.state.scaler.transform(df)
-        proba = app.state.model.predict_proba(scaled_data)[0][1]
-
-        debug_info["prediction"] = {
-            "probability": round(proba, 4),
-            "decision": "Refusé" if proba >= 0.36 else "Accepté",
-        }
-
-        return debug_info
 
     except Exception as e:
-        error_detail = {
-            "error_message": str(e),
-            "debug_info": debug_info if "debug_info" in locals() else None,
-            "traceback": traceback.format_exc(),
-        }
-        raise HTTPException(status_code=500, detail=error_detail)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": str(e),
+                "debug_data": debug_data if "debug_data" in locals() else None,
+            },
+        )
 
 
 @app.get("/")
