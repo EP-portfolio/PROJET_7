@@ -65,10 +65,20 @@ def get_client_row(client_id: int):
 @app.get("/predict/{client_id}")
 async def predict(client_id: int):
     try:
+        # Récupération des valeurs min et max des IDs clients
+        client_ids = list(app.state.client_index.keys())
+        min_id = min(client_ids)
+        max_id = max(client_ids)
         # Récupération des données
         row = await asyncio.to_thread(get_client_row, client_id)
         if not row:
-            raise HTTPException(status_code=404, detail="Client introuvable")
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "message": "Client introuvable",
+                    "plage_valide": f"Les IDs clients valides sont compris entre {min_id} et {max_id}",
+                },
+            )
 
         # Conversion en DataFrame
         df = pd.DataFrame([row], columns=app.state.headers)
