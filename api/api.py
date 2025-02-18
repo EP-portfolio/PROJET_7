@@ -65,27 +65,36 @@ def get_client_row(client_id: int):
 @app.get("/predict/{client_id}")
 async def predict(client_id: int):
     try:
-        # Récupération des valeurs min et max des IDs clients
-        client_ids = list(app.state.client_index.keys())
-        min_id = min(client_ids)
-        max_id = max(client_ids)
         # Récupération des données
         row = await asyncio.to_thread(get_client_row, client_id)
         if not row:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "message": "Client introuvable",
-                    "plage_valide": f"Les IDs clients valides sont compris entre {min_id} et {max_id}",
-                },
-            )
+            raise HTTPException(status_code=404, detail="Client introuvable")
 
-        # Conversion en DataFrame
+        # Ajout de logs pour debug
+        print(f"Nombre de colonnes dans row: {len(row)}")
+        print(f"Headers attendus: {len(app.state.headers)}")
+
+        # Conversion en DataFrame avec vérification explicite
         df = pd.DataFrame([row], columns=app.state.headers)
-        if "TARGET" in df.columns:
-            df = df.drop(columns=["TARGET"])
+        print(f"Colonnes dans DataFrame: {df.shape[1]}")
+        print(
+            f"Colonnes manquantes: {set(app.state.model.feature_names_in_) - set(df.columns)}"
+        )
+        print(
+            f"Colonnes en trop: {set(df.columns) - set(app.state.model.feature_names_in_)}"
+        )
 
-        # Prédiction
+        if "TARGET" in df.columns:
+            df = df.drop(columns=["TARGET", "SK_ID_CURR"])
+
+        # Plus de logs
+        print(f"Colonnes après drop: {df.shape[1]}")
+        print(f"Colonnes attendues par le modèle: {app.state.model.n_features_in_}")
+
+        # Vérification et alignement des colonnes
+        expected_columns = app.state.model.feature_names_in_
+        df = df.reindex(columns=expected_columns, fill_value=0)
+
         scaled_data = app.state.scaler.transform(df)
         proba = app.state.model.predict_proba(scaled_data)[0][1]
 
@@ -95,10 +104,22 @@ async def predict(client_id: int):
             "decision": "Refusé" if proba >= 0.36 else "Accepté",
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": str(e),
+                "row_length": len(row) if "row" in locals() else None,
+                "headers_length": (
+                    len(app.state.headers) if hasattr(app.state, "headers") else None
+                ),
+                "model_features": (
+                    app.state.model.n_features_in_
+                    if hasattr(app.state, "model")
+                    else None
+                ),
+            },
+        )
 
 
 @app.get("/")
