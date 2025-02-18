@@ -58,7 +58,18 @@ def get_client_row(client_id: int):
 
     with open(CSV_PATH, "r") as f:
         f.seek(index[client_id])
-        return next(csv.reader(f))
+        row = next(csv.reader(f))
+        # Ajout de logs
+        print(f"Headers originaux: {app.state.headers}")
+        print(f"Données brutes: {row[:5]}...")  # Affiche les 5 premières colonnes
+
+        # Vérification de l'alignement
+        if len(row) != len(app.state.headers):
+            print(f"Désalignement détecté:")
+            print(f"Nombre de colonnes dans row: {len(row)}")
+            print(f"Nombre de headers: {len(app.state.headers)}")
+
+        return row
 
 
 # Endpoints
