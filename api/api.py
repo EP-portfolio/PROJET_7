@@ -132,7 +132,7 @@ async def predict(client_id: int):
         proba = app.state.model.predict_proba(scaled_data)[0][1]
 
         return {
-            "debug_info": debug_info,
+            # "debug_info": debug_info,
             "prediction": {
                 "probability": round(proba, 4),
                 "decision": "Refusé" if proba >= 0.36 else "Accepté",
