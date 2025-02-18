@@ -50,31 +50,39 @@ def download_files():
 app = FastAPI(title="API Prédiction Crédit", lifespan=lifespan)
 
 
-# Helpers
 def get_client_row(client_id: int):
     """Récupère les données client depuis le CSV"""
     index = app.state.client_index
+
+    # Debug de l'index
+    debug_info = {
+        "client_exists": client_id in index,
+        "index_position": index.get(client_id),
+        "available_ids": sorted(list(index.keys()))[:5],  # 5 premiers IDs disponibles
+    }
+
     if client_id not in index:
-        return None
+        return None, debug_info
 
     with open(CSV_PATH, "r") as f:
+        # Position avant seek
+        debug_info["position_before_seek"] = f.tell()
+
         f.seek(index[client_id])
+
+        # Position après seek
+        debug_info["position_after_seek"] = f.tell()
+
         row = next(csv.reader(f))
 
-        # Debug info initial
-        debug_data = {
-            "headers_info": {
-                "length": len(app.state.headers),
-                "first_10": list(app.state.headers)[:10],
-                "last_10": list(app.state.headers)[-10:],
-            },
-            "row_info": {
-                "length": len(row),
-                "first_10": row[:10],
-                "last_10": row[-10:],
-                "has_index": True if len(row) > 0 else False,
-            },
-        }
+        # Informations sur la ligne lue
+        debug_info["row_length"] = len(row)
+        if len(row) > 0:
+            debug_info["first_value"] = row[0]
+
+        # Si row est vide, retourner None
+        if len(row) == 0:
+            return None, debug_info
 
         # Ignorer la première colonne (index)
         row = row[1:]
@@ -102,13 +110,13 @@ def get_client_row(client_id: int):
                             value = 0
                     default_data[header] = value
 
-        debug_data["after_processing"] = {
+        debug_info["processed_data"] = {
             "data_length": len(default_data),
             "first_10_keys": list(default_data.keys())[:10],
             "first_10_values": list(default_data.values())[:10],
         }
 
-        return debug_data, default_data
+        return default_data, debug_info
 
 
 @app.get("/predict/{client_id}")
@@ -116,10 +124,18 @@ async def predict(client_id: int):
     try:
         # Récupération des données avec debug
         result = await asyncio.to_thread(get_client_row, client_id)
-        if not result:
-            raise HTTPException(status_code=404, detail="Client introuvable")
+        if result is None:
+            min_id = min(app.state.client_index.keys())
+            max_id = max(app.state.client_index.keys())
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "message": "Client introuvable ou données invalides",
+                    "plage_valide": f"Les IDs clients valides sont compris entre {min_id} et {max_id}",
+                },
+            )
 
-        debug_data, client_data = result
+        client_data, debug_info = result
 
         # Créer le DataFrame avec les données traitées
         df = pd.DataFrame([client_data])
@@ -133,7 +149,7 @@ async def predict(client_id: int):
         proba = app.state.model.predict_proba(scaled_data)[0][1]
 
         return {
-            "debug_info": debug_data,
+            "debug_info": debug_info,
             "prediction": {
                 "probability": round(proba, 4),
                 "decision": "Refusé" if proba >= 0.36 else "Accepté",
@@ -145,7 +161,8 @@ async def predict(client_id: int):
             status_code=500,
             detail={
                 "error": str(e),
-                "debug_info": debug_data if "debug_data" in locals() else None,
+                "debug_info": debug_info if "debug_info" in locals() else None,
+                "traceback": traceback.format_exc(),
             },
         )
 
