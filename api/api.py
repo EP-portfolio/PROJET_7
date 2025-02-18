@@ -8,6 +8,7 @@ import pickle
 from pathlib import Path
 import gdown
 import asyncio
+import traceback
 
 # Configuration des chemins
 CSV_URL = "https://drive.google.com/uc?id=1ZUh45n-3RL-WlUehkZpEDYFugTBJuCAR"
@@ -87,31 +88,64 @@ def get_client_row(client_id: int):
 @app.get("/predict/{client_id}")
 async def predict(client_id: int):
     try:
+        # Initialisation des variables de debug
+        debug_info = {}
+
         # Récupération des données
-        result = await asyncio.to_thread(get_client_row, client_id)
-        if not result:
+        row = await asyncio.to_thread(get_client_row, client_id)
+        if not row:
             raise HTTPException(status_code=404, detail="Client introuvable")
 
-        row, initial_state, final_state = result
+        # Ajout des informations initiales
+        debug_info["initial_state"] = {
+            "headers_sample": list(app.state.headers)[:10],
+            "row_sample": row[:10],
+            "headers_length": len(app.state.headers),
+            "row_length": len(row),
+            "model_features": app.state.model.n_features_in_,
+        }
 
-        debug_info = {
-            "original_data": {
-                "headers_sample": list(app.state.headers)[:10],
-                "row_sample": row[:10],
-                "headers_length": len(app.state.headers),
-                "row_length": len(row),
-                "model_features": app.state.model.n_features_in_,
-            },
-            "dataframe_states": {"initial": initial_state, "final": final_state},
+        # Conversion en DataFrame
+        df = pd.DataFrame([row], columns=app.state.headers)
+        debug_info["after_df_creation"] = {
+            "df_columns": list(df.columns)[:10],
+            "df_shape": df.shape,
+        }
+
+        # Gestion de l'index
+        if "SK_ID_CURR" in df.columns:
+            df.set_index("SK_ID_CURR", inplace=True)
+            debug_info["after_index_set"] = {
+                "df_columns": list(df.columns)[:10],
+                "df_shape": df.shape,
+            }
+
+        # Alignement avec le modèle
+        expected_columns = app.state.model.feature_names_in_
+        df = df.reindex(columns=expected_columns, fill_value=0)
+        debug_info["final_state"] = {
+            "df_columns": list(df.columns)[:10],
+            "df_shape": df.shape,
+        }
+
+        # Prédiction
+        scaled_data = app.state.scaler.transform(df)
+        proba = app.state.model.predict_proba(scaled_data)[0][1]
+
+        debug_info["prediction"] = {
+            "probability": round(proba, 4),
+            "decision": "Refusé" if proba >= 0.36 else "Accepté",
         }
 
         return debug_info
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e) if "debug_info" not in locals() else debug_info,
-        )
+        error_detail = {
+            "error_message": str(e),
+            "debug_info": debug_info if "debug_info" in locals() else None,
+            "traceback": traceback.format_exc(),
+        }
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @app.get("/")
