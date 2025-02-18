@@ -54,69 +54,35 @@ def get_client_row(client_id: int):
     """Récupère les données client depuis le CSV"""
     index = app.state.client_index
 
-    # Debug de l'index
     debug_info = {
         "client_exists": client_id in index,
         "index_position": index.get(client_id),
-        "available_ids": sorted(list(index.keys()))[:5],  # 5 premiers IDs disponibles
+        "available_ids": sorted(list(index.keys()))[:5],
     }
 
     if client_id not in index:
         return None, debug_info
 
     with open(CSV_PATH, "r") as f:
-        # Position avant seek
-        debug_info["position_before_seek"] = f.tell()
+        pos = index[client_id]
+        # Lire 100 caractères autour de la position
+        f.seek(max(0, pos - 50))
+        context = f.read(100)
+        debug_info["context"] = context
 
-        f.seek(index[client_id])
-
-        # Position après seek
-        debug_info["position_after_seek"] = f.tell()
-
+        # Retour à la position initiale
+        f.seek(pos)
         row = next(csv.reader(f))
 
-        # Informations sur la ligne lue
-        debug_info["row_length"] = len(row)
-        if len(row) > 0:
-            debug_info["first_value"] = row[0]
+        debug_info.update(
+            {
+                "position_before_seek": pos,
+                "row_length": len(row),
+                "raw_first_chars": context,
+            }
+        )
 
-        # Si row est vide, retourner None
-        if len(row) == 0:
-            return None, debug_info
-
-        # Ignorer la première colonne (index)
-        row = row[1:]
-
-        # Créer un dictionnaire avec les valeurs par défaut
-        default_data = {
-            header: 0 for header in app.state.headers if header != "SK_ID_CURR"
-        }
-
-        # Remplir et convertir les données
-        for i, value in enumerate(row):
-            if i < len(app.state.headers):
-                header = app.state.headers[i]
-                if header != "SK_ID_CURR":
-                    # Convertir les booléens en int
-                    if value.lower() == "true":
-                        value = 1
-                    elif value.lower() == "false":
-                        value = 0
-                    else:
-                        # Convertir en float si possible
-                        try:
-                            value = float(value)
-                        except ValueError:
-                            value = 0
-                    default_data[header] = value
-
-        debug_info["processed_data"] = {
-            "data_length": len(default_data),
-            "first_10_keys": list(default_data.keys())[:10],
-            "first_10_values": list(default_data.values())[:10],
-        }
-
-        return default_data, debug_info
+        return row, debug_info
 
 
 @app.get("/predict/{client_id}")
