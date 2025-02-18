@@ -67,24 +67,30 @@ def get_client_row(client_id: int):
         pos = index[client_id]
         # Reculer jusqu'au début de la ligne
         f.seek(max(0, pos - 100))  # Reculer de 100 caractères pour être sûr
-        # Lire jusqu'à la fin de la ligne précédente
-        while f.read(1) != "\n" and f.tell() < pos:
-            continue
+        buffer = f.read(200)  # Lire un buffer suffisant
 
-        row = next(csv.reader(f))
+        # Trouver le début de la ligne
+        newline_pos = buffer.find("\n")
+        if newline_pos != -1:
+            # Repositionner au début de la ligne
+            f.seek(max(0, pos - 100) + newline_pos + 1)
+            row = next(csv.reader(f))
 
-        debug_info.update(
-            {
-                "position": f.tell(),
-                "row_length": len(row) if row else 0,
-                "row_content": row[:10] if row else None,
-            }
-        )
+            debug_info.update(
+                {
+                    "buffer_sample": buffer[:50],
+                    "row_length": len(row) if row else 0,
+                    "row_content": row[:10] if row else None,
+                }
+            )
 
-        if not row or len(row) == 0:
+            if not row or len(row) == 0:
+                return None, debug_info
+
+            return row, debug_info
+        else:
+            debug_info["error"] = "Pas de nouvelle ligne trouvée dans le buffer"
             return None, debug_info
-
-        return row, debug_info
 
 
 @app.get("/predict/{client_id}")
