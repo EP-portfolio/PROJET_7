@@ -95,6 +95,8 @@ async def predict(client_id: int):
             "decision": "Refusé" if proba >= 0.36 else "Accepté",
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
