@@ -61,7 +61,7 @@ def get_client_row(client_id: int):
         f.seek(index[client_id])
         row = next(csv.reader(f))
 
-        # Debug info avant création du DataFrame
+        # Debug info
         debug_data = {
             "headers_info": {
                 "length": len(app.state.headers),
@@ -72,23 +72,62 @@ def get_client_row(client_id: int):
                 "length": len(row),
                 "first_10": row[:10],
                 "last_10": row[-10:],
+                "has_index": True if len(row) > 0 else False,
             },
         }
 
-        return debug_data
+        # Si la première colonne est l'index (SK_ID_CURR), on la retire
+        if len(row) > 0:
+            row = row[1:]  # Ignorer la première colonne qui est l'index
+
+        # Créer un dictionnaire avec les valeurs par défaut
+        default_data = {
+            header: 0 for header in app.state.headers if header != "SK_ID_CURR"
+        }
+
+        # Remplir avec les données disponibles
+        for i, value in enumerate(row):
+            if i < len(app.state.headers):
+                if app.state.headers[i] != "SK_ID_CURR":  # Ignorer SK_ID_CURR
+                    default_data[app.state.headers[i]] = value
+
+        # Ajouter les infos de debug après traitement
+        debug_data["after_processing"] = {
+            "data_length": len(default_data),
+            "first_10_keys": list(default_data.keys())[:10],
+            "first_10_values": list(default_data.values())[:10],
+        }
+
+        return debug_data, default_data
 
 
 @app.get("/predict/{client_id}")
 async def predict(client_id: int):
     try:
         # Récupération des données avec debug
-        debug_data = await asyncio.to_thread(get_client_row, client_id)
-        if not debug_data:
+        result = await asyncio.to_thread(get_client_row, client_id)
+        if not result:
             raise HTTPException(status_code=404, detail="Client introuvable")
 
+        debug_data, client_data = result
+
+        # Créer le DataFrame avec les données traitées
+        df = pd.DataFrame([client_data])
+
+        # Alignement avec le modèle
+        if hasattr(app.state.model, "feature_names_in_"):
+            df = df.reindex(columns=app.state.model.feature_names_in_, fill_value=0)
+
+        # Prédiction
+        scaled_data = app.state.scaler.transform(df)
+        proba = app.state.model.predict_proba(scaled_data)[0][1]
+
         return {
-            "debug_data": debug_data,
-            "message": "Données brutes avant création du DataFrame",
+            "debug_info": debug_data,
+            "prediction": {
+                "probability": round(proba, 4),
+                "decision": "Refusé" if proba >= 0.36 else "Accepté",
+            },
         }
 
     except Exception as e:
@@ -96,7 +135,7 @@ async def predict(client_id: int):
             status_code=500,
             detail={
                 "error": str(e),
-                "debug_data": debug_data if "debug_data" in locals() else None,
+                "debug_info": debug_data if "debug_data" in locals() else None,
             },
         )
 
