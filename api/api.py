@@ -73,7 +73,7 @@ async def predict(client_id: int):
         # Conversion en DataFrame
         df = pd.DataFrame([row], columns=app.state.headers)
         if "TARGET" in df.columns:
-            df = df.drop(columns=["TARGET", "SK_ID_CURR"])
+            df = df.drop(columns=["TARGET"])
 
         # Prédiction
         scaled_data = app.state.scaler.transform(df)
