@@ -65,22 +65,24 @@ def get_client_row(client_id: int):
 
     with open(CSV_PATH, "r") as f:
         pos = index[client_id]
-        # Lire 100 caractères autour de la position
-        f.seek(max(0, pos - 50))
-        context = f.read(100)
-        debug_info["context"] = context
+        # Reculer jusqu'au début de la ligne
+        f.seek(max(0, pos - 100))  # Reculer de 100 caractères pour être sûr
+        # Lire jusqu'à la fin de la ligne précédente
+        while f.read(1) != "\n" and f.tell() < pos:
+            continue
 
-        # Retour à la position initiale
-        f.seek(pos)
         row = next(csv.reader(f))
 
         debug_info.update(
             {
-                "position_before_seek": pos,
-                "row_length": len(row),
-                "raw_first_chars": context,
+                "position": f.tell(),
+                "row_length": len(row) if row else 0,
+                "row_content": row[:10] if row else None,
             }
         )
+
+        if not row or len(row) == 0:
+            return None, debug_info
 
         return row, debug_info
 
