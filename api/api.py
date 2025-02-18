@@ -61,7 +61,7 @@ def get_client_row(client_id: int):
         f.seek(index[client_id])
         row = next(csv.reader(f))
 
-        # Debug info
+        # Debug info initial
         debug_data = {
             "headers_info": {
                 "length": len(app.state.headers),
@@ -76,22 +76,32 @@ def get_client_row(client_id: int):
             },
         }
 
-        # Si la première colonne est l'index (SK_ID_CURR), on la retire
-        if len(row) > 0:
-            row = row[1:]  # Ignorer la première colonne qui est l'index
+        # Ignorer la première colonne (index)
+        row = row[1:]
 
         # Créer un dictionnaire avec les valeurs par défaut
         default_data = {
             header: 0 for header in app.state.headers if header != "SK_ID_CURR"
         }
 
-        # Remplir avec les données disponibles
+        # Remplir et convertir les données
         for i, value in enumerate(row):
             if i < len(app.state.headers):
-                if app.state.headers[i] != "SK_ID_CURR":  # Ignorer SK_ID_CURR
-                    default_data[app.state.headers[i]] = value
+                header = app.state.headers[i]
+                if header != "SK_ID_CURR":
+                    # Convertir les booléens en int
+                    if value.lower() == "true":
+                        value = 1
+                    elif value.lower() == "false":
+                        value = 0
+                    else:
+                        # Convertir en float si possible
+                        try:
+                            value = float(value)
+                        except ValueError:
+                            value = 0
+                    default_data[header] = value
 
-        # Ajouter les infos de debug après traitement
         debug_data["after_processing"] = {
             "data_length": len(default_data),
             "first_10_keys": list(default_data.keys())[:10],
