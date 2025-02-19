@@ -65,12 +65,10 @@ def get_client_row(client_id: int):
         f.seek(line_position)
         line = f.readline().strip()
 
-        # Log des données brutes
-        print(
-            f"Raw line for client {client_id}: {line[:500]}"
-        )  # Limité à 500 caractères pour éviter les logs trop longs
+        # Vérifier les données brutes
+        debug_info = {"raw_line": line[:500]}
 
-        # Traitement des valeurs
+        # Gérer les valeurs vides et 'nan'
         row = [x.strip() for x in line.split(",")]
         processed_data = {}
 
@@ -83,17 +81,20 @@ def get_client_row(client_id: int):
                 # Convertir les chaînes vides et 'nan' en 0
                 val = float(value) if value not in ["", "nan"] else 0.0
                 processed_data[header] = val
-            except ValueError as e:
-                print(f"Erreur de conversion pour {header}: {value} (erreur: {e})")
+            except ValueError:
                 processed_data[header] = 0.0
 
-        # Log des données traitées
-        print(f"Processed data for client {client_id}: {processed_data}")
+        # Vérifier l'intégrité des données
+        debug_info.update(
+            {
+                "processed_columns": len(processed_data),
+                "missing_features": list(
+                    set(app.state.model.feature_names_in_) - set(processed_data.keys())
+                ),
+            }
+        )
 
-        return processed_data, {
-            "raw_line": line[:500],
-            "processed_data": processed_data,
-        }
+        return processed_data, debug_info
 
 
 @app.get("/predict/{client_id}")
