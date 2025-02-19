@@ -3,48 +3,43 @@ from contextlib import asynccontextmanager
 import joblib
 import pandas as pd
 import os
+import csv
 import pickle
 from pathlib import Path
-import traceback
+import gdown
 import asyncio
+import traceback
 
-# Récupération du port depuis les variables d'environnement
-PORT = int(os.getenv("PORT", "8000"))
-
-# Configuration des chemins de manière plus robuste
-BASE_DIR = Path(__file__).resolve().parent.parent
-MODELS_DIR = BASE_DIR / "models"
-DATA_DIR = BASE_DIR
-
-# Chemins des fichiers
-CSV_PATH = DATA_DIR / "DF_final_train.csv"
-INDEX_PATH = DATA_DIR / "client_index.pkl"
-MODEL_PATH = MODELS_DIR / "credit_model.joblib"
-SCALER_PATH = MODELS_DIR / "scaler.joblib"
+# Configuration des chemins
+CSV_URL = "https://drive.google.com/uc?id=1ZUh45n-3RL-WlUehkZpEDYFugTBJuCAR"
+INDEX_URL = "https://drive.google.com/uc?id=1YpsJKNEyvktJugf7ZNSpOS7FwCJ2gY1e"
+CSV_PATH = Path("DF_final_train.csv")
+INDEX_PATH = Path("client_index.pkl")
 
 
 # Gestion du cycle de vie
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestionnaire de cycle de vie moderne"""
+    # Téléchargement des fichiers
+    await asyncio.to_thread(download_files)
+
     # Chargement des modèles et index
-    app.state.model = joblib.load(MODEL_PATH)
-    app.state.scaler = joblib.load(SCALER_PATH)
+    app.state.model = joblib.load("models/credit_model.joblib")
+    app.state.scaler = joblib.load("models/scaler.joblib")
 
     with open(INDEX_PATH, "rb") as f:
         app.state.headers, app.state.client_index = pickle.load(f)
-    # Après avoir chargé les headers depuis client_index.pkl
-    print("Headers from client_index.pkl:", app.state.headers)
 
-    # Vérifiez les colonnes attendues par le modèle
-    expected_features = app.state.model.feature_names_in_
-    print("Expected features by model:", expected_features)
-
-    # Vérifiez que toutes les colonnes attendues sont présentes
-    missing_features = set(expected_features) - set(app.state.headers)
-    if missing_features:
-        print(f"ATTENTION: Colonnes manquantes dans les headers : {missing_features}")
     yield  # L'application est prête
+
+
+def download_files():
+    """Télécharge les fichiers de données de manière synchrone"""
+    if not CSV_PATH.exists():
+        gdown.download(CSV_URL, str(CSV_PATH), quiet=True)
+    if not INDEX_PATH.exists():
+        gdown.download(INDEX_URL, str(INDEX_PATH), quiet=True)
 
 
 # Initialisation de l'API
@@ -52,49 +47,59 @@ app = FastAPI(title="API Prédiction Crédit", lifespan=lifespan)
 
 
 def get_client_row(client_id: int):
-    """Récupère les données client depuis le CSV en utilisant l'index"""
-    if client_id not in app.state.client_index:
-        return None, {
-            "client_exists": False,
-            "available_ids": sorted(list(app.state.client_index.keys()))[:5],
-        }
+    """Récupère les données client depuis le CSV"""
+    index = app.state.client_index
 
-    line_position = app.state.client_index[client_id]
+    debug_info = {
+        "client_exists": client_id in index,
+        "index_position": index.get(client_id),
+        "available_ids": sorted(list(index.keys()))[:5],
+    }
+
+    if client_id not in index:
+        return None, debug_info
 
     with open(CSV_PATH, "r") as f:
-        f.seek(line_position)
-        line = f.readline().strip()
+        # Lire les 5 premières lignes pour debug
+        first_lines = []
+        for _ in range(5):
+            line = f.readline().strip()
+            if line:
+                first_lines.append(line)
 
-        # Vérifier les données brutes
-        debug_info = {"raw_line": line[:500]}
+        debug_info["first_lines"] = first_lines
 
-        # Gérer les valeurs vides et 'nan'
-        row = [x.strip() for x in line.split(",")]
-        processed_data = {}
+        # Retourner au début du fichier
+        f.seek(0)
 
-        for i, value in enumerate(row[1:]):  # Ignorer la première colonne
-            if i >= len(app.state.headers):
-                break
+        # Chercher la ligne avec l'ID du client
+        for line in f:
+            if line.startswith(str(client_id)):
+                row = next(csv.reader([line]))
+                debug_info.update(
+                    {
+                        "found_line": line[:100],
+                        "row_length": len(row),
+                        "row_content": row[:10] if row else None,
+                    }
+                )
 
-            header = app.state.headers[i]
-            try:
-                # Convertir les chaînes vides et 'nan' en 0
-                val = float(value) if value not in ["", "nan"] else 0.0
-                processed_data[header] = val
-            except ValueError:
-                processed_data[header] = 0.0
+                # Traitement des valeurs
+                if row and len(row) > 1:  # Ignorer la première colonne (index)
+                    processed_data = {}
+                    for i, value in enumerate(
+                        row[1:], 1
+                    ):  # Commencer à 1 pour ignorer l'index
+                        if i < len(app.state.headers):
+                            header = app.state.headers[i]
+                            try:
+                                processed_data[header] = float(value)
+                            except ValueError:
+                                processed_data[header] = 0
+                    return processed_data, debug_info
 
-        # Vérifier l'intégrité des données
-        debug_info.update(
-            {
-                "processed_columns": len(processed_data),
-                "missing_features": list(
-                    set(app.state.model.feature_names_in_) - set(processed_data.keys())
-                ),
-            }
-        )
-
-        return processed_data, debug_info
+        debug_info["error"] = "Client non trouvé dans le fichier"
+        return None, debug_info
 
 
 @app.get("/predict/{client_id}")
