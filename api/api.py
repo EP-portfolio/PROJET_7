@@ -10,11 +10,19 @@ import gdown
 import asyncio
 import traceback
 
-# Configuration des chemins
-CSV_URL = "https://drive.google.com/uc?id=1ZUh45n-3RL-WlUehkZpEDYFugTBJuCAR"
-INDEX_URL = "https://drive.google.com/uc?id=1YpsJKNEyvktJugf7ZNSpOS7FwCJ2gY1e"
-CSV_PATH = Path("DF_final_train.csv")
-INDEX_PATH = Path("client_index.pkl")
+# Récupération du port depuis les variables d'environnement
+PORT = int(os.getenv("PORT", "8000"))
+
+# Configuration des chemins de manière plus robuste
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODELS_DIR = BASE_DIR / "models"
+DATA_DIR = BASE_DIR
+
+# Chemins des fichiers
+CSV_PATH = DATA_DIR / "DF_final_train.csv"
+INDEX_PATH = DATA_DIR / "client_index.pkl"
+MODEL_PATH = MODELS_DIR / "credit_model.joblib"
+SCALER_PATH = MODELS_DIR / "scaler.joblib"
 
 
 # Gestion du cycle de vie
@@ -22,7 +30,6 @@ INDEX_PATH = Path("client_index.pkl")
 async def lifespan(app: FastAPI):
     """Gestionnaire de cycle de vie moderne"""
     # Téléchargement des fichiers
-    await asyncio.to_thread(download_files)
 
     # Chargement des modèles et index
     app.state.model = joblib.load("models/credit_model.joblib")
@@ -32,14 +39,6 @@ async def lifespan(app: FastAPI):
         app.state.headers, app.state.client_index = pickle.load(f)
 
     yield  # L'application est prête
-
-
-def download_files():
-    """Télécharge les fichiers de données de manière synchrone"""
-    if not CSV_PATH.exists():
-        gdown.download(CSV_URL, str(CSV_PATH), quiet=True)
-    if not INDEX_PATH.exists():
-        gdown.download(INDEX_URL, str(INDEX_PATH), quiet=True)
 
 
 # Initialisation de l'API
