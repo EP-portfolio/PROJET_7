@@ -28,29 +28,17 @@ SCALER_PATH = MODELS_DIR / "scaler.joblib"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestionnaire de cycle de vie moderne"""
-    print("Starting application setup...")
-
-    # Vérification de l'existence des fichiers
-    if not CSV_PATH.exists():
-        raise RuntimeError(f"File not found: {CSV_PATH}")
-    if not INDEX_PATH.exists():
-        raise RuntimeError(f"File not found: {INDEX_PATH}")
+    # Téléchargement des fichiers
+    # await asyncio.to_thread(download_files)
 
     # Chargement des modèles et index
-    print("Loading models...")
-    app.state.model = joblib.load("models/credit_model.joblib")
-    print("Credit model loaded")
+    app.state.model = joblib.load(MODEL_PATH)
+    app.state.scaler = joblib.load(SCALER_PATH)
 
-    app.state.scaler = joblib.load("models/scaler.joblib")
-    print("Scaler loaded")
-
-    print("Loading index file...")
     with open(INDEX_PATH, "rb") as f:
         app.state.headers, app.state.client_index = pickle.load(f)
-    print("Index loaded")
 
-    print("Setup complete!")
-    yield
+    yield  # L'application est prête
 
 
 # Initialisation de l'API
@@ -71,32 +59,43 @@ def get_client_row(client_id: int):
         return None, debug_info
 
     with open(CSV_PATH, "r") as f:
-        # Utiliser l'index pour aller directement à la bonne position
-        f.seek(index[client_id])
+        # Lire les 5 premières lignes pour debug
+        first_lines = []
+        for _ in range(5):
+            line = f.readline().strip()
+            if line:
+                first_lines.append(line)
 
-        # Lire la ligne du client
-        line = f.readline().strip()
-        row = next(csv.reader([line]))
+        debug_info["first_lines"] = first_lines
 
-        debug_info.update(
-            {
-                "found_line": line[:100],
-                "row_length": len(row),
-                "row_content": row[:10] if row else None,
-            }
-        )
+        # Retourner au début du fichier
+        f.seek(0)
 
-        # Traitement des valeurs
-        if row and len(row) > 1:  # Ignorer la première colonne (index)
-            processed_data = {}
-            for i, value in enumerate(row[1:], 1):  # Commencer à 1 pour ignorer l'index
-                if i < len(app.state.headers):
-                    header = app.state.headers[i]
-                    try:
-                        processed_data[header] = float(value)
-                    except ValueError:
-                        processed_data[header] = 0
-            return processed_data, debug_info
+        # Chercher la ligne avec l'ID du client
+        for line in f:
+            if line.startswith(str(client_id)):
+                row = next(csv.reader([line]))
+                debug_info.update(
+                    {
+                        "found_line": line[:100],
+                        "row_length": len(row),
+                        "row_content": row[:10] if row else None,
+                    }
+                )
+
+                # Traitement des valeurs
+                if row and len(row) > 1:  # Ignorer la première colonne (index)
+                    processed_data = {}
+                    for i, value in enumerate(
+                        row[1:], 1
+                    ):  # Commencer à 1 pour ignorer l'index
+                        if i < len(app.state.headers):
+                            header = app.state.headers[i]
+                            try:
+                                processed_data[header] = float(value)
+                            except ValueError:
+                                processed_data[header] = 0
+                    return processed_data, debug_info
 
         debug_info["error"] = "Client non trouvé dans le fichier"
         return None, debug_info
@@ -115,10 +114,10 @@ async def predict(client_id: int):
             raise HTTPException(
                 status_code=404,
                 detail={
+                    "message": "Client introuvable ou données invalides",
                     "message": "Client introuvable",
                     "plage_valide": f"Les IDs clients valides sont compris entre {min_id} et {max_id}",
                     "exemple_ids": list(sorted(app.state.client_index.keys()))[:5],
-                    "debug": result[1] if result else None,
                 },
             )
 
@@ -126,28 +125,7 @@ async def predict(client_id: int):
 
         # Créer le DataFrame avec les noms de colonnes explicites
         expected_features = app.state.model.feature_names_in_
-
-        # Vérification de l'alignement des colonnes
-        missing_cols = set(expected_features) - set(client_data.keys())
-        extra_cols = set(client_data.keys()) - set(expected_features)
-
-        if missing_cols or extra_cols:
-            debug_info.update(
-                {
-                    "missing_columns": list(missing_cols),
-                    "extra_columns": list(extra_cols),
-                    "expected_features_count": len(expected_features),
-                    "received_features_count": len(client_data),
-                }
-            )
-            raise ValueError("Colonnes non alignées avec le modèle")
-
-        # Créer le DataFrame aligné
-        df = pd.DataFrame([{col: client_data.get(col, 0) for col in expected_features}])
-
-        # Vérification des NaN
-        if df.isna().any().any():
-            raise ValueError("NaN détectés après création du DataFrame")
+        df = pd.DataFrame([client_data], columns=expected_features)
 
         # Prédiction
         scaled_data = app.state.scaler.transform(df)
@@ -157,9 +135,11 @@ async def predict(client_id: int):
             "prediction": {
                 "probability": round(proba, 4),
                 "decision": "Refusé" if proba >= 0.36 else "Accepté",
-            }
+            },
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
