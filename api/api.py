@@ -118,6 +118,7 @@ async def predict(client_id: int):
                     "message": "Client introuvable",
                     "plage_valide": f"Les IDs clients valides sont compris entre {min_id} et {max_id}",
                     "exemple_ids": list(sorted(app.state.client_index.keys()))[:5],
+                    "debug": result[1] if result else None,
                 },
             )
 
@@ -125,22 +126,40 @@ async def predict(client_id: int):
 
         # Créer le DataFrame avec les noms de colonnes explicites
         expected_features = app.state.model.feature_names_in_
-        df = pd.DataFrame([client_data], columns=expected_features)
+
+        # Vérification de l'alignement des colonnes
+        missing_cols = set(expected_features) - set(client_data.keys())
+        extra_cols = set(client_data.keys()) - set(expected_features)
+
+        if missing_cols or extra_cols:
+            debug_info.update(
+                {
+                    "missing_columns": list(missing_cols),
+                    "extra_columns": list(extra_cols),
+                    "expected_features_count": len(expected_features),
+                    "received_features_count": len(client_data),
+                }
+            )
+            raise ValueError("Colonnes non alignées avec le modèle")
+
+        # Créer le DataFrame aligné
+        df = pd.DataFrame([{col: client_data.get(col, 0) for col in expected_features}])
+
+        # Vérification des NaN
+        if df.isna().any().any():
+            raise ValueError("NaN détectés après création du DataFrame")
 
         # Prédiction
         scaled_data = app.state.scaler.transform(df)
         proba = app.state.model.predict_proba(scaled_data)[0][1]
 
         return {
-            # "debug_info": debug_info,
             "prediction": {
                 "probability": round(proba, 4),
                 "decision": "Refusé" if proba >= 0.36 else "Accepté",
-            },
+            }
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
