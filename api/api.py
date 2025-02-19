@@ -9,9 +9,19 @@ from pathlib import Path
 import traceback
 import asyncio
 
-# Configuration des chemins
-CSV_PATH = Path("DF_final_train.csv")
-INDEX_PATH = Path("client_index.pkl")
+# Récupération du port depuis les variables d'environnement
+PORT = int(os.getenv("PORT", "8000"))
+
+# Configuration des chemins de manière plus robuste
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODELS_DIR = BASE_DIR / "models"
+DATA_DIR = BASE_DIR
+
+# Chemins des fichiers
+CSV_PATH = DATA_DIR / "DF_final_train.csv"
+INDEX_PATH = DATA_DIR / "client_index.pkl"
+MODEL_PATH = MODELS_DIR / "credit_model.joblib"
+SCALER_PATH = MODELS_DIR / "scaler.joblib"
 
 
 # Gestion du cycle de vie

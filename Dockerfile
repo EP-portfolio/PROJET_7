@@ -31,4 +31,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 10000
 
 # Commande pour démarrer l'application
-CMD ["uvicorn", "api.api:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD uvicorn api.api:app --host 0.0.0.0 --port $PORT
