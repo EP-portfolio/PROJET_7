@@ -71,43 +71,32 @@ def get_client_row(client_id: int):
         return None, debug_info
 
     with open(CSV_PATH, "r") as f:
-        # Lire les 5 premières lignes pour debug
-        first_lines = []
-        for _ in range(5):
-            line = f.readline().strip()
-            if line:
-                first_lines.append(line)
+        # Utiliser l'index pour aller directement à la bonne position
+        f.seek(index[client_id])
 
-        debug_info["first_lines"] = first_lines
+        # Lire la ligne du client
+        line = f.readline().strip()
+        row = next(csv.reader([line]))
 
-        # Retourner au début du fichier
-        f.seek(0)
+        debug_info.update(
+            {
+                "found_line": line[:100],
+                "row_length": len(row),
+                "row_content": row[:10] if row else None,
+            }
+        )
 
-        # Chercher la ligne avec l'ID du client
-        for line in f:
-            if line.startswith(str(client_id)):
-                row = next(csv.reader([line]))
-                debug_info.update(
-                    {
-                        "found_line": line[:100],
-                        "row_length": len(row),
-                        "row_content": row[:10] if row else None,
-                    }
-                )
-
-                # Traitement des valeurs
-                if row and len(row) > 1:  # Ignorer la première colonne (index)
-                    processed_data = {}
-                    for i, value in enumerate(
-                        row[1:], 1
-                    ):  # Commencer à 1 pour ignorer l'index
-                        if i < len(app.state.headers):
-                            header = app.state.headers[i]
-                            try:
-                                processed_data[header] = float(value)
-                            except ValueError:
-                                processed_data[header] = 0
-                    return processed_data, debug_info
+        # Traitement des valeurs
+        if row and len(row) > 1:  # Ignorer la première colonne (index)
+            processed_data = {}
+            for i, value in enumerate(row[1:], 1):  # Commencer à 1 pour ignorer l'index
+                if i < len(app.state.headers):
+                    header = app.state.headers[i]
+                    try:
+                        processed_data[header] = float(value)
+                    except ValueError:
+                        processed_data[header] = 0
+            return processed_data, debug_info
 
         debug_info["error"] = "Client non trouvé dans le fichier"
         return None, debug_info
