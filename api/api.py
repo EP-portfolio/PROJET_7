@@ -6,13 +6,10 @@ import os
 import csv
 import pickle
 from pathlib import Path
-import gdown
-import asyncio
 import traceback
+import asyncio
 
 # Configuration des chemins
-CSV_URL = "https://drive.google.com/uc?id=1ZUh45n-3RL-WlUehkZpEDYFugTBJuCAR"
-INDEX_URL = "https://drive.google.com/uc?id=1YpsJKNEyvktJugf7ZNSpOS7FwCJ2gY1e"
 CSV_PATH = Path("DF_final_train.csv")
 INDEX_PATH = Path("client_index.pkl")
 
@@ -21,25 +18,29 @@ INDEX_PATH = Path("client_index.pkl")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestionnaire de cycle de vie moderne"""
-    # Téléchargement des fichiers
-    await asyncio.to_thread(download_files)
+    print("Starting application setup...")
+
+    # Vérification de l'existence des fichiers
+    if not CSV_PATH.exists():
+        raise RuntimeError(f"File not found: {CSV_PATH}")
+    if not INDEX_PATH.exists():
+        raise RuntimeError(f"File not found: {INDEX_PATH}")
 
     # Chargement des modèles et index
+    print("Loading models...")
     app.state.model = joblib.load("models/credit_model.joblib")
-    app.state.scaler = joblib.load("models/scaler.joblib")
+    print("Credit model loaded")
 
+    app.state.scaler = joblib.load("models/scaler.joblib")
+    print("Scaler loaded")
+
+    print("Loading index file...")
     with open(INDEX_PATH, "rb") as f:
         app.state.headers, app.state.client_index = pickle.load(f)
+    print("Index loaded")
 
-    yield  # L'application est prête
-
-
-def download_files():
-    """Télécharge les fichiers de données de manière synchrone"""
-    if not CSV_PATH.exists():
-        gdown.download(CSV_URL, str(CSV_PATH), quiet=True)
-    if not INDEX_PATH.exists():
-        gdown.download(INDEX_URL, str(INDEX_PATH), quiet=True)
+    print("Setup complete!")
+    yield
 
 
 # Initialisation de l'API

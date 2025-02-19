@@ -1,0 +1,20 @@
+# Caches et environnements virtuels
+.pytest_cache
+.venv
+__pycache__
+*/__pycache__/
+
+# Fichiers de gestion de projet
+poetry.lock
+pyproject.toml
+PROJET_7
+.git
+.gitignore
+
+# Fichiers de données et résultats
+full_dataset.xls
+submission_kernel02.csv
+lgbm_importances01.png
+
+# Tests
+tests/
