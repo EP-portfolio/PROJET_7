@@ -33,7 +33,17 @@ async def lifespan(app: FastAPI):
 
     with open(INDEX_PATH, "rb") as f:
         app.state.headers, app.state.client_index = pickle.load(f)
+    # Après avoir chargé les headers depuis client_index.pkl
+    print("Headers from client_index.pkl:", app.state.headers)
 
+    # Vérifiez les colonnes attendues par le modèle
+    expected_features = app.state.model.feature_names_in_
+    print("Expected features by model:", expected_features)
+
+    # Vérifiez que toutes les colonnes attendues sont présentes
+    missing_features = set(expected_features) - set(app.state.headers)
+    if missing_features:
+        print(f"ATTENTION: Colonnes manquantes dans les headers : {missing_features}")
     yield  # L'application est prête
 
 
@@ -49,35 +59,41 @@ def get_client_row(client_id: int):
             "available_ids": sorted(list(app.state.client_index.keys()))[:5],
         }
 
-    # Récupérer la position de la ligne dans le fichier CSV
     line_position = app.state.client_index[client_id]
 
-    # Ouvrir le fichier CSV et lire la ligne correspondante
     with open(CSV_PATH, "r") as f:
-        # Se déplacer à la position de la ligne
         f.seek(line_position)
         line = f.readline().strip()
 
-        # Traitement de la ligne
-        row = line.split(",")
-        if len(row) > 1:  # Ignorer la première colonne (index)
-            processed_data = {}
-            for i, value in enumerate(row[1:], 1):  # Commencer à 1 pour ignorer l'index
-                if i < len(app.state.headers):
-                    header = app.state.headers[i]
-                    try:
-                        processed_data[header] = float(value)
-                    except ValueError:
-                        processed_data[header] = 0
-            return processed_data, {
-                "client_exists": True,
-                "row_content": processed_data,
-            }
+        # Log des données brutes
+        print(
+            f"Raw line for client {client_id}: {line[:500]}"
+        )  # Limité à 500 caractères pour éviter les logs trop longs
 
-    return None, {
-        "client_exists": False,
-        "error": "Ligne non trouvée dans le fichier",
-    }
+        # Traitement des valeurs
+        row = [x.strip() for x in line.split(",")]
+        processed_data = {}
+
+        for i, value in enumerate(row[1:]):  # Ignorer la première colonne
+            if i >= len(app.state.headers):
+                break
+
+            header = app.state.headers[i]
+            try:
+                # Convertir les chaînes vides et 'nan' en 0
+                val = float(value) if value not in ["", "nan"] else 0.0
+                processed_data[header] = val
+            except ValueError as e:
+                print(f"Erreur de conversion pour {header}: {value} (erreur: {e})")
+                processed_data[header] = 0.0
+
+        # Log des données traitées
+        print(f"Processed data for client {client_id}: {processed_data}")
+
+        return processed_data, {
+            "raw_line": line[:500],
+            "processed_data": processed_data,
+        }
 
 
 @app.get("/predict/{client_id}")
