@@ -114,7 +114,6 @@ async def predict(client_id: int):
             raise HTTPException(
                 status_code=404,
                 detail={
-                    "message": "Client introuvable ou données invalides",
                     "message": "Client introuvable",
                     "plage_valide": f"Les IDs clients valides sont compris entre {min_id} et {max_id}",
                     "exemple_ids": list(sorted(app.state.client_index.keys()))[:5],
