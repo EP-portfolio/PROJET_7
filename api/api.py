@@ -21,7 +21,7 @@ DATA_DIR = BASE_DIR
 # Chemins des fichiers
 CSV_PATH = DATA_DIR / "DF_final_train.csv"
 INDEX_PATH = DATA_DIR / "client_index.pkl"
-MODEL_PATH = MODELS_DIR / "credit_model.joblib"
+MODEL_PATH = MODELS_DIR / "lgbm_model.joblib"
 SCALER_PATH = MODELS_DIR / "scaler.joblib"
 
 
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     # Téléchargement des fichiers
 
     # Chargement des modèles et index
-    app.state.model = joblib.load("models/credit_model.joblib")
+    app.state.model = joblib.load("models/lgbm_model.joblib")
     app.state.scaler = joblib.load("models/scaler.joblib")
 
     with open(INDEX_PATH, "rb") as f:
