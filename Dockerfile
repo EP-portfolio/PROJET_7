@@ -19,6 +19,7 @@ RUN gdown https://drive.google.com/uc?id=1ZUh45n-3RL-WlUehkZpEDYFugTBJuCAR -O DF
 
 # Copier les autres fichiers depuis le repo
 COPY models/credit_model.joblib models/
+COPY models/lgbm_model.joblib models/
 COPY models/scaler.joblib models/
 COPY client_index.pkl .
 COPY api/ api/
