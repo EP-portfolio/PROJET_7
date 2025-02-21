@@ -133,7 +133,7 @@ async def predict(client_id: int):
         return {
             "prediction": {
                 "probability": round(proba, 4),
-                "decision": "Refusé" if proba >= 0.36 else "Accepté",
+                "decision": "Refusé" if proba >= 0.34 else "Accepté",
             },
         }
 

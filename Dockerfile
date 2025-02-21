@@ -20,8 +20,7 @@ RUN mkdir -p models
 
 # Télécharger uniquement le fichier volumineux
 RUN pip install gdown
-RUN gdown https://drive.google.com/uc?id=1ZUh45n-3RL-WlUehkZpEDYFugTBJuCAR -O DF_final_train.csv
-
+RUN gdown https://drive.google.com/uc?id=1VEuZsG9zlU0WziMSFG3J5CRkpU8szN10 -O DF_final_train.csv
 # Copier les autres fichiers depuis le repo
 COPY models/credit_model.joblib models/
 COPY models/lgbm_model.joblib models/
