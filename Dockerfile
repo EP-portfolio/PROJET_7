@@ -24,7 +24,7 @@ RUN mkdir -p models
 # Télécharger uniquement le fichier volumineux
 RUN pip install gdown
 #RUN gdown https://drive.google.com/uc?id=1VEuZsG9zlU0WziMSFG3J5CRkpU8szN10 -O DF_final_train.csv
-RUN gdown https://drive.google.com/uc?id=1VEuZsG9zlU0WziMSFG3J5CRkpU8szN10 -O DF_median_impute.csv
+RUN gdown https://drive.google.com/uc?id=1_3ldear7Xjbix9_9zDrI8qC2Dpj0lUzA -O DF_median_impute.csv
 
 # Copier les autres fichiers depuis le repo
 COPY models/credit_model.joblib models/
