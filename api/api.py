@@ -21,7 +21,7 @@ DATA_DIR = BASE_DIR
 # Chemins des fichiers
 CSV_PATH = DATA_DIR / "DF_median_impute.csv"
 INDEX_PATH = DATA_DIR / "client_index.pkl"
-MODEL_PATH = MODELS_DIR / "lgbm_model.joblib"
+MODEL_PATH = MODELS_DIR / "median_model.joblib"
 
 
 # Gestion du cycle de vie
