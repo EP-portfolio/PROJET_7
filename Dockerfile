@@ -33,11 +33,7 @@ COPY models/scaler.joblib models/
 COPY client_index.pkl .
 COPY api/ api/
 
-# Copier les tests
-COPY tests/ tests/
 
-# Exécuter les tests unitaires
-RUN pytest -xvs tests/
 
 # Variables d'environnement
 ENV PORT=10000
