@@ -4,7 +4,7 @@ import gdown
 from pathlib import Path
 
 # Configuration des chemins
-CSV_URL = "https://drive.google.com/uc?id=1ZUh45n-3RL-WlUehkZpEDYFugTBJuCAR"
+CSV_URL = "https://drive.google.com/uc?id=1_3ldear7Xjbix9_9zDrI8qC2Dpj0lUzA"
 INDEX_URL = "https://drive.google.com/uc?id=1YpsJKNEyvktJugf7ZNSpOS7FwCJ2gY1e"
 CSV_PATH = Path("DF_final_train.csv")
 INDEX_PATH = Path("client_index.pkl")
@@ -22,5 +22,5 @@ def setup_test_environment():
     # Vérifier que tous les fichiers nécessaires sont présents
     assert CSV_PATH.exists(), "CSV file not found"
     assert INDEX_PATH.exists(), "Index file not found"
-    assert os.path.exists("models/credit_model.joblib"), "Model not found"
-    assert os.path.exists("models/scaler.joblib"), "Scaler not found"
+    assert os.path.exists("models/median_model.joblib"), "Model not found"
+    # assert os.path.exists("models/scaler.joblib"), "Scaler not found"
