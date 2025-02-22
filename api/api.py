@@ -19,21 +19,17 @@ MODELS_DIR = BASE_DIR / "models"
 DATA_DIR = BASE_DIR
 
 # Chemins des fichiers
-CSV_PATH = DATA_DIR / "DF_final_train.csv"
+CSV_PATH = DATA_DIR / "DF_median_impute.csv"
 INDEX_PATH = DATA_DIR / "client_index.pkl"
 MODEL_PATH = MODELS_DIR / "lgbm_model.joblib"
-SCALER_PATH = MODELS_DIR / "scaler.joblib"
 
 
 # Gestion du cycle de vie
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestionnaire de cycle de vie moderne"""
-    # Téléchargement des fichiers
-
-    # Chargement des modèles et index
-    app.state.model = joblib.load("models/lgbm_model.joblib")
-    app.state.scaler = joblib.load("models/scaler.joblib")
+    # Chargement du modèle et index
+    app.state.model = joblib.load(MODEL_PATH)
 
     with open(INDEX_PATH, "rb") as f:
         app.state.headers, app.state.client_index = pickle.load(f)
@@ -126,9 +122,8 @@ async def predict(client_id: int):
         expected_features = app.state.model.feature_names_in_
         df = pd.DataFrame([client_data], columns=expected_features)
 
-        # Prédiction
-        scaled_data = app.state.scaler.transform(df)
-        proba = app.state.model.predict_proba(scaled_data)[0][1]
+        # Prédiction directe sans scaling
+        proba = app.state.model.predict_proba(df)[0][1]
 
         return {
             "prediction": {
