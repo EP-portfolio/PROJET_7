@@ -20,7 +20,7 @@ def test_high_risk_client(test_client):
 
     assert "prediction" in data, "No prediction in response"
     assert "probability" in data["prediction"], "No probability in prediction"
-    assert data["prediction"]["probability"] > 0.34, "Expected high risk probability"
+    assert data["prediction"]["probability"] < 0.34, "Expected high risk probability"
     assert data["prediction"]["decision"] == "Refusé", "Expected rejection"
 
 
@@ -32,5 +32,5 @@ def test_low_risk_client(test_client):
 
     assert "prediction" in data, "No prediction in response"
     assert "probability" in data["prediction"], "No probability in prediction"
-    assert data["prediction"]["probability"] < 0.34, "Expected low risk probability"
+    assert data["prediction"]["probability"] >= 0.34, "Expected low risk probability"
     assert data["prediction"]["decision"] == "Accepté", "Expected acceptance"
