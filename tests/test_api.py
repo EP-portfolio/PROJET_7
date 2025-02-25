@@ -13,24 +13,24 @@ async def test_client():
 
 # Note: plus besoin du décorateur @pytest.mark.asyncio car nous n'utilisons pas d'appels asynchrones dans les tests
 def test_high_risk_client(test_client):
-    """Test pour un client à haut risque (ID: 100002)"""
-    response = test_client.get("/predict/100002")
+    """Test pour un client à haut risque (ID: 296838)"""
+    response = test_client.get("/predict/296838")
     assert response.status_code == 200, f"Error: {response.json()}"
     data = response.json()
 
     assert "prediction" in data, "No prediction in response"
     assert "probability" in data["prediction"], "No probability in prediction"
-    assert data["prediction"]["probability"] < 0.34, "Expected high risk probability"
-    assert data["prediction"]["decision"] == "Accepté", "Expected rejection"
+    assert data["prediction"]["probability"] >= 0.34, "Expected high risk probability"
+    assert data["prediction"]["decision"] == "Refusé", "Expected rejection"
 
 
 def test_low_risk_client(test_client):
-    """Test pour un client à faible risque (ID: 100003)"""
-    response = test_client.get("/predict/100003")
+    """Test pour un client à faible risque (ID: 103430)"""
+    response = test_client.get("/predict/103430")
     assert response.status_code == 200, f"Error: {response.json()}"
     data = response.json()
 
     assert "prediction" in data, "No prediction in response"
     assert "probability" in data["prediction"], "No probability in prediction"
-    assert data["prediction"]["probability"] >= 0.34, "Expected low risk probability"
-    assert data["prediction"]["decision"] == "Refusé", "Expected acceptance"
+    assert data["prediction"]["probability"] < 0.34, "Expected low risk probability"
+    assert data["prediction"]["decision"] == "Accepté", "Expected acceptance"
