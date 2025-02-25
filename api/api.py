@@ -42,7 +42,7 @@ app = FastAPI(title="API Prédiction Crédit", lifespan=lifespan)
 
 
 def get_client_row(client_id: int):
-    """Récupère les données client depuis le CSV"""
+    """Récupère les données client depuis le CSV en préservant les types booléens"""
     index = app.state.client_index
 
     debug_info = {
@@ -87,10 +87,16 @@ def get_client_row(client_id: int):
                     ):  # Commencer à 1 pour ignorer l'index
                         if i < len(app.state.headers):
                             header = app.state.headers[i]
-                            try:
-                                processed_data[header] = float(value)
-                            except ValueError:
-                                processed_data[header] = 0
+
+                            # Détecter et préserver les booléens
+                            if value.lower() in ["true", "false"]:
+                                processed_data[header] = value.lower() == "true"
+                            else:
+                                try:
+                                    processed_data[header] = float(value)
+                                except ValueError:
+                                    processed_data[header] = 0
+
                     return processed_data, debug_info
 
         debug_info["error"] = "Client non trouvé dans le fichier"
