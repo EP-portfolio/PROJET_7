@@ -265,3 +265,33 @@ async def debug_info():
             len(app.state.client_index) if hasattr(app.state, "client_index") else None
         ),
     }
+
+
+@app.get("/client-data/{client_id}")
+async def get_client_data_endpoint(client_id: int):
+    """Endpoint pour récupérer les données brutes d'un client"""
+    try:
+        # Utilisez la fonction get_client_row existante
+        result = await asyncio.to_thread(get_client_row, client_id)
+
+        # Vérifier si le client existe
+        if not result or result[0] is None:
+            min_id = min(app.state.client_index.keys())
+            max_id = max(app.state.client_index.keys())
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "message": "Client introuvable",
+                    "plage_valide": f"Les IDs clients valides sont compris entre {min_id} et {max_id}",
+                },
+            )
+
+        client_data, debug_info = result
+
+        # Retourner seulement les données du client sans faire de prédiction
+        return {"client_id": client_id, "data": client_data}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": str(e)})
