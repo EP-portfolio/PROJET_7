@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 # Variables d'environnement
-API_URL = st.secrets.get("API_URL", "http://127.0.0.1:8000")  # URL configurable
+API_URL = "https://projet-7-docker.onrender.com"  # URL configurable
 
 
 # Chargement du modèle et des données pour l'analyse locale
@@ -98,8 +98,10 @@ def predict_client(client_id):
 
 
 # Fonction pour générer l'explication SHAP locale
-def generate_shap_explanation(model, client_data, feature_names):
-    """Génère une explication SHAP pour un client spécifique"""
+def generate_improved_shap_explanation(
+    model, client_data, feature_names, num_features=10
+):
+    """Génère une explication SHAP améliorée et accessible pour un client spécifique"""
     # Préparer les données
     client_df = pd.DataFrame([client_data], columns=feature_names)
 
@@ -109,12 +111,147 @@ def generate_shap_explanation(model, client_data, feature_names):
     # Calculer les valeurs SHAP
     shap_values = explainer.shap_values(client_df)
 
-    # Créer le graphique
-    fig, ax = plt.figure(figsize=(10, 8), dpi=100), plt.gca()
-    shap.summary_plot(
-        shap_values[1], client_df, feature_names=feature_names, show=False
+    # Vérifier le format des valeurs SHAP
+    if isinstance(shap_values, list) and len(shap_values) > 1:
+        # Format pour classification binaire [classe0, classe1]
+        values = shap_values[1]
+    else:
+        # Format unique array
+        values = shap_values
+
+    # Créer un DataFrame avec les valeurs SHAP et les valeurs des caractéristiques
+    shap_df = pd.DataFrame(
+        {
+            "Feature": feature_names,
+            "SHAP_Value": values[0],
+            "Feature_Value": client_df.iloc[0].values,
+            "Abs_Impact": np.abs(values[0]),
+        }
     )
-    plt.title("Impact des caractéristiques sur la prédiction", fontsize=16)
+
+    # Trier par impact absolu et prendre les top caractéristiques
+    shap_df = shap_df.sort_values("Abs_Impact", ascending=False).head(num_features)
+
+    # Transformer les noms de caractéristiques avec des sauts de ligne pour les longs noms
+    feature_descriptions = {
+        "EXT_SOURCE_1": "Score externe 1",
+        "EXT_SOURCE_2": "Score externe 2",
+        "EXT_SOURCE_3": "Score externe 3",
+        "DAYS_EMPLOYED": "Jours d'emploi",
+        "ACTIVE_DAYS_CREDIT_MAX": "Jours max\ncrédit actif",
+        "PREV_CNT_PAYMENT_MEAN": "Nombre moyen\nde paiements",
+        "PAYMENT_RATE": "Taux de paiement",
+        "INSTAL_DBD_SUM": "Jours en retard\nde paiement",
+        "INSTAL_DPD_MEAN": "Jours en retard\nmoyen",
+        "BURO_DAYS_CREDIT_MAX": "Jours max\ncrédit bureau",
+        "PREV_NAME_CONTRACT_STATUS_Refused_MEAN": "Taux de refus\nprécédent",
+        "NAME_EDUCATION_TYPE_Higher_education": "Niveau d'études\nsupérieur",
+        "BURO_AMT_CREDIT_SUM_DEBT_MEAN": "Dette moyenne\ncrédit bureau",
+        "AMT_ANNUITY": "Montant annuité",
+        "POS_SK_DPD_DEF_MEAN": "Jours moyen retard\npoints de vente",
+        "BURO_DAYS_CREDIT_ENDDATE_MAX": "Date fin max\ncrédit bureau",
+        "CODE_GENDER": "Genre",
+        "BURO_DAYS_CREDIT_MEAN": "Jours moyen\ncrédit bureau",
+        "APPROVED_AMT_DOWN_PAYMENT_MAX": "Acompte max\napprouvé",
+        "INSTAL_PAYMENT_DIFF_MEAN": "Différence moyenne\nde paiement",
+        # Ajoutez d'autres descriptions selon vos besoins
+    }
+
+    # Appliquer les descriptions améliorées si disponibles
+    shap_df["Feature_Display"] = shap_df["Feature"].map(
+        lambda x: feature_descriptions.get(x, x)
+    )
+
+    # Créer une échelle de couleurs accessible
+    # Utiliser une échelle bleu-orange (meilleure pour le daltonisme)
+    colors = []
+    for val in shap_df["SHAP_Value"]:
+        if val < 0:  # Impact négatif (réduit le risque)
+            colors.append("#1E88E5")  # Bleu
+        else:  # Impact positif (augmente le risque)
+            colors.append("#F57C00")  # Orange
+
+    # Augmenter la taille du graphique
+    fig, ax = plt.subplots(figsize=(18, 14))
+
+    # Barres horizontales
+    bars = ax.barh(
+        y=shap_df["Feature_Display"],
+        width=shap_df["SHAP_Value"],
+        color=colors,
+        height=0.7,
+    )
+
+    # Ajouter une ligne verticale à zéro
+    ax.axvline(x=0, color="gray", linestyle="-", alpha=0.3)
+
+    # Augmenter la taille de la police pour l'axe Y (noms des caractéristiques)
+    ax.tick_params(axis="y", labelsize=20)
+    ax.tick_params(axis="x", labelsize=20)
+
+    # Annotation de chaque barre avec la valeur de la caractéristique
+    for i, bar in enumerate(bars):
+        feature_value = shap_df.iloc[i]["Feature_Value"]
+        # Formater les valeurs pour l'affichage
+        if isinstance(feature_value, (int, float)):
+            if abs(feature_value) >= 1000:
+                value_text = f"{feature_value:.0f}"
+            elif abs(feature_value) >= 100:
+                value_text = f"{feature_value:.1f}"
+            else:
+                value_text = f"{feature_value:.2f}"
+        else:
+            value_text = str(feature_value)
+
+        # Positionner le texte
+        x_pos = bar.get_width()
+        if x_pos < 0:
+            x_pos = x_pos - 0.01
+            ha = "right"
+        else:
+            x_pos = x_pos + 0.01
+            ha = "left"
+
+        ax.text(
+            x_pos,
+            bar.get_y() + bar.get_height() / 2,
+            value_text,
+            va="center",
+            ha=ha,
+            fontweight="bold",
+            color="black",
+            fontsize=12,
+            bbox=dict(facecolor="white", alpha=0.7, edgecolor="none", pad=1),
+        )
+
+    # Styliser le graphique
+    ax.set_title(
+        "Impact des caractéristiques sur le risque de défaut",
+        fontsize=20,
+        fontweight="bold",
+    )
+    ax.set_xlabel("Impact sur la prédiction", fontsize=16)
+
+    # Augmenter l'espacement entre les barres
+    ax.set_ylim([-0.5, len(shap_df) - 0.5])
+
+    # Ajouter une marge à gauche pour les noms longs
+    plt.subplots_adjust(left=0.3)
+
+    # Ajouter une note explicative avec une police plus grande
+    ax.text(
+        0,
+        -0.6,
+        "Note: Les barres à droite (orange) indiquent les facteurs qui augmentent le risque de défaut de paiement.\n"
+        "Les barres à gauche (bleues) indiquent les facteurs qui réduisent ce risque.\n"
+        "Les valeurs à côté de chaque barre montrent la valeur réelle de la caractéristique pour ce client.",
+        transform=ax.transAxes,
+        ha="center",
+        va="top",
+        fontsize=18,
+        style="italic",
+    )
+
     plt.tight_layout()
     return fig
 
@@ -327,10 +464,10 @@ with col1:
                     st.markdown("### Explication de la décision")
 
                     # Afficher l'importance globale des features pour ce client
-                    shap_fig = generate_shap_explanation(
-                        model, client_data, model.feature_names_in_
+                    shap_fig = generate_improved_shap_explanation(
+                        model, client_data, model.feature_names_in_, num_features=8
                     )
-                    st.pyplot(shap_fig)
+                    st.pyplot(shap_fig, use_container_width=True)
 
                     # Afficher les distributions pour les top features
                     st.markdown("### Position du client sur les caractéristiques clés")
@@ -353,7 +490,8 @@ with col2:
     st.markdown("### Seuil de décision")
     st.markdown(
         """
-        <div class="important-info">
+        <div style="background-color: #F8F9FA; color: #1E3A8A; padding: 10px; 
+        border-radius: 5px; border-left: 5px solid #1E88E5; font-size: 18px;">
             Un client avec une probabilité de défaut supérieure à <strong>34%</strong> se verra refuser le crédit.
         </div>
         """,
