@@ -25,7 +25,7 @@ CSV_URL = os.getenv(
     "CSV_URL", "https://drive.google.com/uc?id=1Qa7dhg9gjP0l-Ka3dLgH2npH-1BU5LXJ"
 )
 INDEX_URL = os.getenv(
-    "INDEX_URL", "https://drive.google.com/uc?id=1YpsJKNEyvktJugf7ZNSpOS7FwCJ2gY1e"
+    "INDEX_URL", "https://drive.google.com/uc?id=1pEVEswfdB-rdn_Qz77nNVV5ugacqGSxy"
 )
 
 # Configuration des chemins de manière plus robuste
