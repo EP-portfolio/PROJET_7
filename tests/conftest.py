@@ -4,7 +4,7 @@ import gdown
 from pathlib import Path
 
 # Configuration des chemins
-CSV_URL = "https://drive.google.com/uc?id=1_3ldear7Xjbix9_9zDrI8qC2Dpj0lUzA"
+CSV_URL = "https://drive.google.com/uc?id=1Qa7dhg9gjP0l-Ka3dLgH2npH-1BU5LXJ"
 INDEX_URL = "https://drive.google.com/uc?id=1YpsJKNEyvktJugf7ZNSpOS7FwCJ2gY1e"
 CSV_PATH = Path("DF_median_impute.csv")
 INDEX_PATH = Path("client_index.pkl")
