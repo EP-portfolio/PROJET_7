@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Récupération du port depuis les variables d'environnement
 PORT = int(os.getenv("PORT", "8000"))
 
-# URLs pour les téléchargements (normalement à mettre dans des variables d'environnement)
+# URLs pour les téléchargements
 CSV_URL = os.getenv(
     "CSV_URL", "https://drive.google.com/uc?id=1Qa7dhg9gjP0l-Ka3dLgH2npH-1BU5LXJ"
 )
@@ -28,10 +28,10 @@ INDEX_URL = os.getenv(
     "INDEX_URL", "https://drive.google.com/uc?id=1pEVEswfdB-rdn_Qz77nNVV5ugacqGSxy"
 )
 
-# Configuration des chemins de manière plus robuste
+# Configuration des chemins
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = BASE_DIR / "models"
-DATA_DIR = BASE_DIR / "data"  # Séparation plus claire pour les données
+DATA_DIR = BASE_DIR / "data"
 
 # Créer les répertoires s'ils n'existent pas
 os.makedirs(MODELS_DIR, exist_ok=True)
