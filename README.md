@@ -15,6 +15,7 @@ Le système comprend :
 
 •	Un système de monitoring pour détecter le data drift
  
+
 Structure du projet
 
 |-- api/                             # Code source de l'API
@@ -61,57 +62,57 @@ Structure du projet
 Installation
 1.	Cloner le dépôt :
 
-Bash :
+    Bash :
 
-git clone https://github.com/EP-portfolio/PROJET_7.git
+    git clone https://github.com/EP-portfolio/PROJET_7.git
 
-cd PROJET_7
+    cd PROJET_7
 
 2.	Installer les dépendances :
 
-Bash :
+    Bash :
 
-pip install -r requirements.txt
+    pip install -r requirements.txt
 
 3.	Télécharger les fichiers de données nécessaires :
 
-Bash :
+    Bash :
 
-python -c "import gdown; gdown.download('https://drive.google.com/uc?id=1Qa7dhg9gjP0l-Ka3dLgH2npH-1BU5LXJ', 'DF_median_impute.csv')"
+    python -c "import gdown; gdown.download('https://drive.google.com/uc?id=1Qa7dhg9gjP0l-Ka3dLgH2npH-1BU5LXJ', 'DF_median_impute.csv')"
 
-python -c "import gdown; gdown.download('https://drive.google.com/uc?id=1pEVEswfdB-rdn_Qz77nNVV5ugacqGSxy', 'client_index.pkl')"
+    python -c "import gdown; gdown.download('https://drive.google.com/uc?id=1pEVEswfdB-rdn_Qz77nNVV5ugacqGSxy', 'client_index.pkl')"
 
 Utilisation
 
-Exécuter l'API localement
+    Exécuter l'API localement
 
-Bash :
+        Bash :
 
-uvicorn api.api:app --reload --port 8000
+        uvicorn api.api:app --reload --port 8000
 
-L'API sera accessible à l'adresse : http://localhost:8000
+    L'API sera accessible à l'adresse : http://localhost:8000
 
-Documentation de l'API : http://localhost:8000/docs
+    Documentation de l'API : http://localhost:8000/docs
 
-Exécuter le dashboard Streamlit
+    Exécuter le dashboard Streamlit
 
-Bash :
+        Bash :
 
-streamlit run app.py
+        streamlit run app.py
 
-Le dashboard sera accessible à l'adresse : http://localhost:8501
+    Le dashboard sera accessible à l'adresse : http://localhost:8501
 
-Exécuter les tests
+    Exécuter les tests
 
-Bash :
+        Bash :
 
-pytest tests/ -v
+        pytest tests/ -v
 
 Déploiement
 
 Le projet est configuré pour être déployé sur Render.com :
-1.	L'API est déployée via Docker
-2.	L'URL de l'API en production est : https://projet-7-docker.onrender.com
+    1.	L'API est déployée via Docker
+    2.	L'URL de l'API en production est : https://projet-7-docker.onrender.com
 
 Points clés du modèle
 
@@ -135,7 +136,7 @@ Le modèle utilise SHAP (SHapley Additive exPlanations) pour fournir :
 
 •	Des explications locales pour chaque prédiction individuelle
 
-•	Des visualisations de la position du client par rapport à la distribution globale
+•	Des visualisations de la position du client au sein des distributions des variables les plus impactantes dans la décision le concernant
 
 Monitoring
 
