@@ -295,3 +295,104 @@ async def get_client_data_endpoint(client_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": str(e)})
+
+
+from fastapi import Body
+
+
+@app.post("/predict-modified")
+async def predict_modified(client_id: int, modified_features: dict = Body(...)):
+    """
+    Effectue une prédiction avec des caractéristiques modifiées manuellement
+
+    Args:
+        client_id: ID du client pour récupérer ses données de base
+        modified_features: Dictionnaire des caractéristiques modifiées {feature_name: new_value}
+    """
+    try:
+        # Récupération des données originales avec debug
+        result = await asyncio.to_thread(get_client_row, client_id)
+
+        # Vérifier si le client existe
+        if not result or result[0] is None:
+            min_id = min(app.state.client_index.keys())
+            max_id = max(app.state.client_index.keys())
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "message": "Client introuvable",
+                    "plage_valide": f"Les IDs clients valides sont compris entre {min_id} et {max_id}",
+                    "exemple_ids": list(sorted(app.state.client_index.keys()))[:5],
+                    "debug_info": result[1] if result else None,
+                },
+            )
+
+        client_data, debug_info = result
+
+        # Appliquer les modifications aux données client
+        for feature, value in modified_features.items():
+            if feature in client_data:
+                client_data[feature] = value
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"La caractéristique '{feature}' n'existe pas pour ce client",
+                )
+
+        # Créer le DataFrame avec les noms de colonnes explicites
+        expected_features = app.state.model.feature_names_in_
+        df = pd.DataFrame([client_data], columns=expected_features)
+
+        # Prédiction directe sans scaling
+        proba = app.state.model.predict_proba(df)[0][1]
+
+        return {
+            "prediction": {
+                "probability": round(proba, 4),
+                "decision": "Refusé" if proba >= 0.34 else "Accepté",
+            },
+            "modified_features": modified_features,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": str(e),
+                "debug_info": debug_info if "debug_info" in locals() else None,
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+
+@app.get("/features-info")
+async def features_info():
+    """Renvoie les informations sur les caractéristiques du modèle"""
+    if not hasattr(app.state, "model"):
+        raise HTTPException(status_code=500, detail="Le modèle n'est pas chargé")
+
+    # Récupérer les features du modèle
+    features = app.state.model.feature_names_in_
+
+    # Calculer l'importance des features si disponible
+    importance = None
+    if hasattr(app.state.model, "feature_importances_"):
+        importance = app.state.model.feature_importances_
+
+    # Créer un dictionnaire feature -> importance
+    features_info = {}
+    for i, feat in enumerate(features):
+        features_info[feat] = {
+            "importance": float(importance[i]) if importance is not None else None
+        }
+
+    # Trier par importance
+    sorted_features = sorted(
+        features_info.items(),
+        key=lambda x: x[1]["importance"] if x[1]["importance"] is not None else 0,
+        reverse=True,
+    )
+
+    return {"features": dict(sorted_features)}
